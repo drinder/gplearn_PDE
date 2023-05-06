@@ -19,8 +19,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import graphviz
 
-from scipy.io import loadmat
-
 #%% Define derivative function
 
 def diff(u,a):
@@ -138,99 +136,65 @@ graph = graphviz.Source(dot_data)
 graph.render('images/ex1_child', format='png', cleanup=True)
 graph.render(view=True)
 
-#%% burgers' equation
+#%% PDE-FIND example: Burgers' equation
 
-burgers = loadmat("./burgers.mat")
+from scipy.io import loadmat
+from PDE_FIND.PDE_FIND import build_linear_system, TrainSTRidge, print_pde
 
-x = burgers['x']
-t = burgers['t']
+data = loadmat("./PDE_FIND/datasets/burgers.mat")
 
-length = np.min([x.size, t.size])
+x = data['x']
+t = data['t']
 
-x = x[0,0:length]
-t = t[0:length,0]
-
-x_mesh,t_mesh = np.meshgrid(x,t)
-
-u = burgers['usol'][0:length,0:length]
+u = data['usol']
 u = np.real(u)
-u = np.flip(u, axis=0)
 
-ax = plt.figure().add_subplot(projection='3d')
-surf = ax.plot_surface(x_mesh, t_mesh, u, rstride=1, cstride=1, color='green', alpha=0.5)
-plt.show()
+x, t = np.meshgrid(x, t)
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+surf = ax.plot_surface(x, t, u.T, rstride=1, cstride=1, linewidth=0, antialiased=False, cmap='coolwarm')
+plt.title('u(x,t)', fontsize = 16)
+plt.xlabel('x', fontsize = 16)
+plt.ylabel('t', fontsize = 16)
 
-del ax, surf
+u_t, theta, candidates = build_linear_system(u, dt = t[1,0]-t[0,0], dx = x[0,1]-x[0,0], D=3, P=3, time_diff = 'FD', space_diff = 'FD')
+candidates[0] = '1'
 
-#%%
+w = TrainSTRidge(theta, u_t, lam=10**-5, d_tol=0.1)
+print("PDE derived using STRidge")
+print_pde(w, candidates)
 
-function_set=('add', 'sub', 'mul', 'div','Diff', 'Diff2')
+#%% PDE-FIND example 2: Kuramoto-Sivashinksy equation
 
-_function_set = []
-for function in function_set:
-    if isinstance(function, str):
-        if function not in _function_map:
-            raise ValueError('invalid function name %s found in '
-                              '`function_set`.' % function)
-        _function_set.append(_function_map[function])
-    elif isinstance(function, _Function):
-        _function_set.append(function)
-    else:
-        raise ValueError('invalid type %s found in `function_set`.'
-                          % type(function))
-function_set = _function_set
+data = loadmat("./PDE_FIND/Datasets/kuramoto_sivishinky.mat")
 
-arities = {}
-for function in _function_set:
-    arity = function.arity
-    arities[arity] = arities.get(arity, [])
-    arities[arity].append(function)
-    
-init_depth=(2, 6)
-init_method='half and half'
-transformer=None
-metric='mean absolute error'
-parsimony_coefficient=0.001
-p_point_replace=0.05
-feature_names=None  
-const_range = (-1.,1.) 
+x = data['x']
+t = data['tt']
 
-# x = np.linspace(start=0, stop=1, num=100)
-# t = np.linspace(start=0, stop=10, num=100)
+u = data['uu']
 
-# x_mesh,t_mesh = np.meshgrid(x,t)
+#dt = t[1]-t[0]
+#dx = x[2]-x[1]
 
-# u = x_mesh + t_mesh
+#n = len(x)
+#m = len(t)
 
-# X = np.concatenate((x[:,np.newaxis],t[:,np.newaxis],u), axis=1)
+x, t = np.meshgrid(x, t)
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+surf = ax.plot_surface(x, t, u.T, rstride=1, cstride=1, linewidth=0, antialiased=False, cmap='coolwarm')
+plt.title('u(x,t)', fontsize = 16)
+plt.xlabel('x', fontsize = 16)
+plt.ylabel('t', fontsize = 16)
 
-n_samples = X.shape[0]
-n_features = 3
+u_t, theta, candidates = build_linear_system(u, dt = t[1,0]-t[0,0], dx = x[0,1]-x[0,0], D=5, P=5, time_diff = 'FD', space_diff = 'FD')
+candidates[0] = '1'
 
-
-program = _Program(function_set=function_set,
-                    arities=arities,
-                    init_depth=init_depth,
-                    init_method=init_method,
-                    n_features=n_features,
-                    metric=metric,
-                    transformer=transformer,
-                    const_range=const_range,
-                    p_point_replace=p_point_replace,
-                    parsimony_coefficient=parsimony_coefficient,
-                    feature_names=feature_names,
-                    random_state=check_random_state(1),
-                    program=None)
-
-y_hat = program.validate_program()
+w = TrainSTRidge(theta, u_t, lam=10**-5, d_tol=5)
+print("PDE derived using STRidge")
+print_pde(w, candidates)
 
 
 
-#%% Visualize
-
-dot_data = program.export_graphviz()
-graph = graphviz.Source(dot_data)
-graph.render('images/ex1_child', format='png', cleanup=True)
-graph.render(view=True)
 
 
