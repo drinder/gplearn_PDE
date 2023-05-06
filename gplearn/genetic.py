@@ -37,7 +37,11 @@ MAX_INT = np.iinfo(np.int32).max
 
 def _parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params):
     """Private function used to build a batch of programs within a job."""
-    n_samples, n_features = X.shape
+    # n_samples, n_features = X.shape
+    
+    n_samples = X.shape[0]
+    n_features = 3
+    
     # Unpack parameters
     tournament_size = params['tournament_size']
     function_set = params['function_set']
@@ -127,12 +131,14 @@ def _parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params):
                            feature_names=feature_names,
                            random_state=random_state,
                            program=program)
+        program.validate_program()
 
         program.parents = genome
 
         # Draw samples, using sample weights, and then fit
         if sample_weight is None:
-            curr_sample_weight = np.ones((n_samples,))
+            #curr_sample_weight = np.ones((n_samples,))
+            curr_sample_weight = np.ones((n_samples,n_samples))
         else:
             curr_sample_weight = sample_weight.copy()
         oob_sample_weight = curr_sample_weight.copy()
@@ -143,7 +149,6 @@ def _parallel_evolve(n_programs, parents, X, y, sample_weight, seeds, params):
 
         curr_sample_weight[not_indices] = 0
         oob_sample_weight[indices] = 0
-
         program.raw_fitness_ = program.raw_fitness(X, y, curr_sample_weight)
         if max_samples < n_samples:
             # Calculate OOB fitness
@@ -289,7 +294,7 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
             sample_weight = _check_sample_weight(sample_weight, X)
 
         if isinstance(self, ClassifierMixin):
-            X, y = self._validate_data(X, y, y_numeric=False)
+            # X, y = self._validate_data(X, y, y_numeric=False)
             check_classification_targets(y)
 
             if self.class_weight:
@@ -308,8 +313,8 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                                  % n_trim_classes)
             self.n_classes_ = len(self.classes_)
 
-        else:
-            X, y = self._validate_data(X, y, y_numeric=True)
+        # else:
+        #    X, y = self._validate_data(X, y, y_numeric=True)
 
         hall_of_fame = self.hall_of_fame
         if hall_of_fame is None:
@@ -473,19 +478,21 @@ class BaseSymbolic(BaseEstimator, metaclass=ABCMeta):
                 self.population_size, self.n_jobs)
             seeds = random_state.randint(MAX_INT, size=self.population_size)
 
-            population = Parallel(n_jobs=n_jobs,
-                                  verbose=int(self.verbose > 1))(
-                delayed(_parallel_evolve)(n_programs[i],
-                                          parents,
-                                          X,
-                                          y,
-                                          sample_weight,
-                                          seeds[starts[i]:starts[i + 1]],
-                                          params)
-                for i in range(n_jobs))
+            # population = Parallel(n_jobs=n_jobs,
+            #                       verbose=int(self.verbose > 1))(
+            #     delayed(_parallel_evolve)(n_programs[i],
+            #                               parents,
+            #                               X,
+            #                               y,
+            #                               sample_weight,
+            #                               seeds[starts[i]:starts[i + 1]],
+            #                               params)
+            #     for i in range(n_jobs))
+            
+            population = _parallel_evolve(self.population_size,parents,X,y,sample_weight,seeds,params)
 
             # Reduce, maintaining order across different n_jobs
-            population = list(itertools.chain.from_iterable(population))
+            # population = list(itertools.chain.from_iterable(population))
 
             fitness = [program.raw_fitness_ for program in population]
             length = [program.length_ for program in population]
@@ -859,7 +866,8 @@ class SymbolicRegressor(BaseSymbolic, RegressorMixin):
             raise NotFittedError('SymbolicRegressor not fitted.')
 
         X = check_array(X)
-        _, n_features = X.shape
+        # _, n_features = X.shape
+        n_features = 3
         if self.n_features_in_ != n_features:
             raise ValueError('Number of features of the model must match the '
                              'input. Model n_features is %s and input '
@@ -1155,7 +1163,8 @@ class SymbolicClassifier(BaseSymbolic, ClassifierMixin):
             raise NotFittedError('SymbolicClassifier not fitted.')
 
         X = check_array(X)
-        _, n_features = X.shape
+        # _, n_features = X.shape
+        n_features = 3
         if self.n_features_in_ != n_features:
             raise ValueError('Number of features of the model must match the '
                              'input. Model n_features is %s and input '
@@ -1485,7 +1494,8 @@ class SymbolicTransformer(BaseSymbolic, TransformerMixin):
             raise NotFittedError('SymbolicTransformer not fitted.')
 
         X = check_array(X)
-        _, n_features = X.shape
+        # _, n_features = X.shape
+        n_features = 3
         if self.n_features_in_ != n_features:
             raise ValueError('Number of features of the model must match the '
                              'input. Model n_features is %s and input '

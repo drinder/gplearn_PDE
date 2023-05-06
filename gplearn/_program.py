@@ -186,19 +186,20 @@ class _Program(object):
         function = random_state.randint(len(self.function_set))
         function = self.function_set[function]
         program = [function]
-        terminal_stack = [function.arity]
+        terminal_stack = [[function.name, function.arity]]
+        
+        is_diff = False
 
         while terminal_stack:
             depth = len(terminal_stack)
             choice = self.n_features + len(self.function_set)
             choice = random_state.randint(choice)
             # Determine if we are adding a function or terminal
-            if (depth < max_depth) and (method == 'full' or
-                                        choice <= len(self.function_set)):
+            if ((is_diff == False) and (depth < max_depth) and (method == 'full' or choice <= len(self.function_set))):
                 function = random_state.randint(len(self.function_set))
                 function = self.function_set[function]
                 program.append(function)
-                terminal_stack.append(function.arity)
+                terminal_stack.append([function.name, function.arity])
             else:
                 # We need a terminal, add a variable or constant
                 if self.const_range is not None:
@@ -211,29 +212,46 @@ class _Program(object):
                         # We should never get here
                         raise ValueError('A constant was produced with '
                                          'const_range=None.')
+                if is_diff:
+                    terminal = 0
+
+                    
+                    
                 program.append(terminal)
-                terminal_stack[-1] -= 1
-                while terminal_stack[-1] == 0:
+                terminal_stack[-1][1] -= 1
+                if (terminal_stack[-1][1] == 1 and (terminal_stack[-1][0] == "Diff" or terminal_stack[-1][0] == "Diff2")):
+                    is_diff = True
+                else:
+                    is_diff = False
+                while terminal_stack[-1][1] == 0:
                     terminal_stack.pop()
                     if not terminal_stack:
                         return program
-                    terminal_stack[-1] -= 1
+                    terminal_stack[-1][1] -= 1
+                    if (terminal_stack[-1][1] == 1 and (terminal_stack[-1][0] == "Diff" or terminal_stack[-1][0] == "Diff2")):
+                        is_diff = True
+                    else:
+                        is_diff = False
 
         # We should never get here
         return None
 
     def validate_program(self):
         """Rough check that the embedded program in the object is valid."""
-        terminals = [0]
+        terminals = [['placeholder',0]]
+        i = 0
         for node in self.program:
             if isinstance(node, _Function):
-                terminals.append(node.arity)
+                terminals.append([node.name, node.arity])
             else:
-                terminals[-1] -= 1
-                while terminals[-1] == 0:
+                terminals[-1][1] -= 1
+                while terminals[-1][1] == 0:
+                    if (terminals[-1][0]=='Diff' or terminals[-1][0]=='Diff2'):
+                        self.program[i]==0
                     terminals.pop()
-                    terminals[-1] -= 1
-        return terminals == [-1]
+                    terminals[-1][1] -= 1
+            ++i
+        return terminals[0][1] == -1
 
     def __str__(self):
         """Overloads `print` output of the object to resemble a LISP tree."""
@@ -357,10 +375,18 @@ class _Program(object):
         # Check for single-node programs
         node = self.program[0]
         if isinstance(node, float):
-            return np.repeat(node, X.shape[0])
+            return node * np.ones((X.shape[0],X.shape[0]))
         if isinstance(node, int):
-            return X[:, node]
-
+            if node == 0:
+                return np.tile(X[:,0],(X.shape[0],1))
+            elif node == 1:
+                return np.tile(X[:,1],(X.shape[0],1)).T
+            elif node == 2:
+                return X[:,2:]
+            else:
+                raise ValueError('Integer must be 0 (x), '
+                                 '1 (t), or 2 (u(x,t)).')
+                
         apply_stack = []
 
         for node in self.program:
@@ -374,9 +400,15 @@ class _Program(object):
             while len(apply_stack[-1]) == apply_stack[-1][0].arity + 1:
                 # Apply functions that have sufficient arguments
                 function = apply_stack[-1][0]
-                terminals = [np.repeat(t, X.shape[0]) if isinstance(t, float)
-                             else X[:, t] if isinstance(t, int)
-                             else t for t in apply_stack[-1][1:]]
+                # terminals = [np.repeat(t, X.shape[0]) if isinstance(t, float)
+                #              else X[:, t] if isinstance(t, int)
+                #              else t for t in apply_stack[-1][1:]]
+                
+                terminals = [t*np.ones((X.shape[0],X.shape[0])) if isinstance(t, float)
+                              else np.tile(X[:,0],(X.shape[0],1)) if (np.all(t==0) and np.all(isinstance(t,int)))
+                              else np.tile(X[:,1],(X.shape[0],1)).T if (np.all(t==1) and np.all(isinstance(t,int)))
+                              else X[:,2:] if (np.all(t==2) and np.all(isinstance(t,int)))
+                              else t for t in apply_stack[-1][1:]]
                 intermediate_result = function(*terminals)
                 if len(apply_stack) != 1:
                     apply_stack.pop()
@@ -508,7 +540,7 @@ class _Program(object):
             program = self.program
         # Choice of crossover points follows Koza's (1992) widely used approach
         # of choosing functions 90% of the time and leaves 10% of the time.
-        probs = np.array([0.9 if isinstance(node, _Function) else 0.1
+        probs = np.array([1 if isinstance(node, _Function) else 0
                           for node in program])
         probs = np.cumsum(probs / probs.sum())
         start = np.searchsorted(probs, random_state.uniform())

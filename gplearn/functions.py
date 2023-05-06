@@ -94,13 +94,13 @@ def make_function(*, function, name, arity, wrap=True):
         function(*args)
     except (ValueError, TypeError):
         raise ValueError('supplied function %s does not support arity of %d.'
-                         % (name, arity))
+                          % (name, arity))
     if not hasattr(function(*args), 'shape'):
         raise ValueError('supplied function %s does not return a numpy array.'
-                         % name)
+                          % name)
     if function(*args).shape != (10,):
         raise ValueError('supplied function %s does not return same shape as '
-                         'input vectors.' % name)
+                          'input vectors.' % name)
 
     # Check closure for zero & negative input arguments
     args = [np.zeros(10) for _ in range(arity)]
@@ -148,6 +148,60 @@ def _sigmoid(x1):
     """Special case of logistic function to transform to probabilities."""
     with np.errstate(over='ignore', under='ignore'):
         return 1 / (1 + np.exp(-x1))
+    
+# def _diff_X(u, x):
+    
+#     dx = x[0,1] - x[0,0]
+        
+#     n = u.shape[1]
+#     ux = np.zeros(u.shape)
+
+#     for i in range(1, n - 1):
+#         ux[:,i] = (u[:,i + 1] - u[:,i - 1]) / (2 * dx)
+
+#     ux[:,0] = (-3.0 / 2 * u[:,0] + 2 * u[:,1] - u[:,2] / 2) / dx
+#     ux[:,n - 1] = (3.0 / 2 * u[:,n - 1] - 2 * u[:,n - 2] + u[:,n - 3] / 2) / dx
+    
+#     return ux
+
+# def _diff_T(u, t):
+    
+#     dt = t[1,0] - t[0,0]
+
+#     n = u.shape[0]
+#     ut = np.zeros(u.shape)
+
+#     for i in range(1, n - 1):
+#         ut[i,:] = (u[i + 1,:] - u[i - 1,:]) / (2 * dt)
+
+#     ut[0,:] = (-3.0 / 2 * u[0,:] + 2 * u[1,:] - u[2,:] / 2) / dt
+#     ut[n - 1,:] = (3.0 / 2 * u[n - 1,:] - 2 * u[n - 2,:] + u[n - 3,:] / 2) / dt
+    
+#     return ut
+
+def _diff(u,a):
+    
+    if (a[0,1] - a[0,0]) > (a[1,0] - a[0,0]):
+        a = a[0,:]
+        return np.gradient(u,a,a, edge_order=2)[1]
+    else:
+        a = a[:,0]
+        return np.gradient(u,a,a, edge_order=2)[0]
+    
+def _diff2(u,a):
+    
+    du = _diff(u,a)
+    return _diff(du,a)
+    
+    # if (a[0,1] - a[0,0]) > (a[1,0] - a[0,0]):
+    #     a = a[0,:]
+    #     du = np.gradient(u,a,a, edge_order=2)[1]
+    #     return np.gradient(du,a,a, edge_order=2)[1]
+    # else:
+    #     a = a[:,0]
+    #     du = np.gradient(u,a,a, edge_order=2)[0]
+    #     return np.gradient(du,a,a, edge_order=2)[0]
+        
 
 
 add2 = _Function(function=np.add, name='add', arity=2)
@@ -166,6 +220,9 @@ cos1 = _Function(function=np.cos, name='cos', arity=1)
 tan1 = _Function(function=np.tan, name='tan', arity=1)
 sig1 = _Function(function=_sigmoid, name='sig', arity=1)
 
+Diff = _Function(function=_diff, name='Diff', arity=2)
+Diff2 = _Function(function=_diff2, name='Diff2', arity=2)
+
 _function_map = {'add': add2,
                  'sub': sub2,
                  'mul': mul2,
@@ -179,4 +236,6 @@ _function_map = {'add': add2,
                  'min': min2,
                  'sin': sin1,
                  'cos': cos1,
-                 'tan': tan1}
+                 'tan': tan1,
+                 'Diff': Diff,
+                 'Diff2': Diff2}
