@@ -173,12 +173,6 @@ t = data['tt']
 
 u = data['uu']
 
-#dt = t[1]-t[0]
-#dx = x[2]-x[1]
-
-#n = len(x)
-#m = len(t)
-
 x, t = np.meshgrid(x, t)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
