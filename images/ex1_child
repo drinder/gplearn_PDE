@@ -1,6 +1,6 @@
 digraph program {
 node [style=filled]
-0 [label="Diff2", fillcolor="#136ed4"] ;
+0 [label="Diff", fillcolor="#136ed4"] ;
 1 [label="X2", fillcolor="#60a6f6"] ;
 2 [label="X0", fillcolor="#60a6f6"] ;
 0 -> 2 ;

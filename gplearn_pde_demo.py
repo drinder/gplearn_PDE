@@ -30,7 +30,6 @@ def diff(u,a):
         a = a[:,0]
         return np.gradient(u,a,a, edge_order=2)[0]
 
-
 #%% Generate ground truth data for the PDE: u_{t} = u_{x}
 
 x = np.linspace(start=0, stop=1, num=100)
